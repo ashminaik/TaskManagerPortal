@@ -215,7 +215,3 @@ Open **http://localhost:5173**
 ## Deployment
 
 Deployed on Railway with separate frontend + backend services. Auto-deploys on push to `main`.
-
-## License
-
-MIT
