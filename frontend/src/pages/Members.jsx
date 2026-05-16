@@ -3,6 +3,7 @@ import { Search, ChevronDown, ChevronUp, UserPlus, Trash2 } from 'lucide-react';
 import { usersAPI } from '../api/axios';
 import { getProjectColor } from '../utils/helpers';
 import Modal from '../components/Modal';
+import Spinner from '../components/Spinner';
 import toast from 'react-hot-toast';
 
 const PROJECT_TEAMS = {
@@ -77,29 +78,28 @@ export default function Members() {
 
   const renderMemberRow = (m) => (
     <div key={m._id} className="bg-white rounded-2xl border border-border-color">
-      <div className="flex items-center justify-between p-5 cursor-pointer hover:bg-hover-highlight/50 transition-colors" onClick={() => toggleExpand(m._id)}>
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-olive/20 flex items-center justify-center text-olive font-bold">{m.name?.[0]?.toUpperCase() || m.email[0].toUpperCase()}</div>
+      <div className="flex items-start justify-between p-4 cursor-pointer hover:bg-hover-highlight/50 transition-colors" onClick={() => toggleExpand(m._id)}>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-olive/20 flex items-center justify-center text-olive font-bold text-sm">{m.name?.[0]?.toUpperCase() || m.email[0].toUpperCase()}</div>
           <div><p className="text-sm font-semibold text-text-primary">{m.name || m.email}</p><p className="text-xs text-text-secondary">{m.email}</p></div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${getProjectColor(m.project)}`}>{m.project || '—'}</span>
-          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-text-secondary">{m.team || '—'}</span>
-          <span className="text-xs text-olive font-medium">{expanded[m._id] ? 'Show Less' : 'Show More'}</span>
-          {expanded[m._id] ? <ChevronUp size={16} className="text-text-secondary" /> : <ChevronDown size={16} className="text-text-secondary" />}
+        <div className="flex flex-col items-end gap-1">
+          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${getProjectColor(m.project)}`}>{m.project || '—'}</span>
+          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-text-secondary">{m.team || '—'}</span>
+          <span className="text-[10px] text-olive font-medium mt-1">{expanded[m._id] ? 'Show Less' : 'Show More'}</span>
         </div>
       </div>
       {expanded[m._id] && (
-        <div className="px-5 pb-5 border-t border-border-color/50 pt-4 space-y-3">
+        <div className="px-5 pb-6 pt-3 border-t border-border-color/50 space-y-3">
           <div className="grid grid-cols-2 gap-4">
-            <div><p className="text-xs text-text-secondary mb-0.5">Project</p><span className={`text-xs font-medium px-2 py-0.5 rounded-full ${getProjectColor(m.project)}`}>{m.project || '—'}</span></div>
-            <div><p className="text-xs text-text-secondary mb-0.5">Team</p><p className="text-sm text-text-primary">{m.team || '—'}</p></div>
+            <div><p className="text-[10px] text-text-secondary mb-0.5">Project</p><span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${getProjectColor(m.project)}`}>{m.project || '—'}</span></div>
+            <div><p className="text-[10px] text-text-secondary mb-0.5">Team</p><p className="text-sm text-text-primary">{m.team || '—'}</p></div>
           </div>
           <div>
-            <p className="text-xs text-text-secondary mb-2">Tasks Assigned ({m.assignedTaskCount})</p>
+            <p className="text-[10px] text-text-secondary mb-2">Tasks Assigned ({m.assignedTaskCount})</p>
             {m.assignedTaskCount > 0 ? (
-              <div className="space-y-1">{m.assignedTaskTitles.map((title, i) => (<div key={i} className="flex items-center gap-2 py-1.5 px-3 bg-hover-highlight rounded-lg text-sm text-text-primary"><div className="w-1.5 h-1.5 rounded-full bg-olive" />{title}</div>))}</div>
-            ) : <p className="text-sm text-text-secondary italic">No tasks assigned</p>}
+              <div className="space-y-1">{m.assignedTaskTitles.map((title, i) => (<div key={i} className="flex items-center gap-2 py-1.5 px-3 bg-hover-highlight rounded-lg text-xs text-text-primary"><div className="w-1.5 h-1.5 rounded-full bg-olive" />{title}</div>))}</div>
+            ) : <p className="text-xs text-text-secondary italic">No tasks assigned</p>}
           </div>
         </div>
       )}
@@ -135,7 +135,7 @@ export default function Members() {
       </div>
 
       {loading ? (
-        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="bg-white rounded-2xl border border-border-color p-5 animate-pulse h-16" />)}</div>
+        <Spinner />
       ) : filtered.length === 0 ? (
         <div className="text-center py-16"><p className="text-text-secondary text-lg">No members found.</p></div>
       ) : hasFilters ? (

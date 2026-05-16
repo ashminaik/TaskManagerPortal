@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { dashboardAPI } from '../api/axios';
+import Spinner from '../components/Spinner';
 
 const PIE_COLORS = ['#9BA86F', '#E8C7D3', '#B7C9EA', '#E9C75B', '#E58D8D'];
 const BAR_COLORS = {

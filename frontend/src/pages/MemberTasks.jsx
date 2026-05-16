@@ -4,6 +4,8 @@ import { tasksAPI } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import TaskCard from '../components/TaskCard';
 import Modal from '../components/Modal';
+import Spinner from '../components/Spinner';
+import TaskDetailOverlay from '../components/TaskDetailOverlay';
 import { getPriorityColor, getStatusColor, getProjectColor, formatDate } from '../utils/helpers';
 
 export default function MemberTasks() {
@@ -26,9 +28,11 @@ export default function MemberTasks() {
   }, [fetchTasks]);
 
   const handleStatusChange = async (taskId, newStatus) => {
+    setTasks((prev) =>
+      prev.map((t) => (t._id === taskId ? { ...t, status: newStatus } : t))
+    );
     await tasksAPI.updateStatus(taskId, newStatus);
     toast.success(`Status updated to ${newStatus}`);
-    fetchTasks();
   };
 
   return (
@@ -69,11 +73,7 @@ export default function MemberTasks() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-2xl border border-border-color p-5 animate-pulse h-40" />
-          ))}
-        </div>
+        <Spinner />
       ) : tasks.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-text-secondary text-lg">No tasks assigned to you yet.</p>
@@ -92,56 +92,12 @@ export default function MemberTasks() {
         </div>
       )}
 
-      <Modal isOpen={detailOpen} onClose={() => { setDetailOpen(false); setSelectedTask(null); }} title="Task Details">
-        {selectedTask && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-text-secondary mb-0.5">Title</p>
-                <p className="text-text-primary font-medium">{selectedTask.title}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary mb-0.5">Status</p>
-                <select
-                  value={selectedTask.status}
-                  onChange={(e) => handleStatusChange(selectedTask._id, e.target.value)}
-                  className={`text-xs font-medium px-2 py-1 rounded-full cursor-pointer ${getStatusColor(selectedTask.status)}`}
-                >
-                  <option value="To Do">To Do</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Done">Done</option>
-                </select>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary mb-0.5">Project</p>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${getProjectColor(selectedTask.projectType)}`}>
-                  {selectedTask.projectType}
-                </span>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary mb-0.5">Team</p>
-                <p className="text-text-primary">{selectedTask.team}</p>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary mb-0.5">Priority</p>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${getPriorityColor(selectedTask.priority)}`}>
-                  {selectedTask.priority}
-                </span>
-              </div>
-              <div>
-                <p className="text-xs text-text-secondary mb-0.5">Due Date</p>
-                <p className="text-text-primary">{selectedTask.dueDate ? formatDate(selectedTask.dueDate) : '—'}</p>
-              </div>
-            </div>
-            {selectedTask.description && (
-              <div>
-                <p className="text-xs text-text-secondary mb-1">Description</p>
-                <p className="text-text-primary text-sm">{selectedTask.description}</p>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+      <TaskDetailOverlay
+        task={selectedTask}
+        onClose={() => { setDetailOpen(false); setSelectedTask(null); }}
+        statusOptions={['To Do', 'In Progress', 'Done']}
+        onStatusChange={handleStatusChange}
+      />
     </div>
   );
 }

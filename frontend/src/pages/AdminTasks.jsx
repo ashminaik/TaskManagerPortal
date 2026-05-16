@@ -6,6 +6,8 @@ import { tasksAPI, usersAPI } from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import TaskCard from '../components/TaskCard';
 import Modal from '../components/Modal';
+import Spinner from '../components/Spinner';
+import TaskDetailOverlay from '../components/TaskDetailOverlay';
 import { formatDate, getPriorityColor, getStatusColor, getProjectColor } from '../utils/helpers';
 
 const PROJECT_TEAMS = {
@@ -222,11 +224,7 @@ export default function AdminTasks() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-2xl border border-border-color p-5 animate-pulse h-40" />
-          ))}
-        </div>
+        <Spinner />
       ) : tasks.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-text-secondary text-lg">No tasks yet. Create your first task.</p>
@@ -448,142 +446,41 @@ export default function AdminTasks() {
         </div>
       </Modal>
 
-      <Modal isOpen={detailOpen} onClose={() => { setDetailOpen(false); setSelectedTask(null); setEditing(false); }} title="Task Details">
+      <TaskDetailOverlay
+        task={selectedTask}
+        onClose={() => { setDetailOpen(false); setSelectedTask(null); }}
+        onEdit={() => setEditing(true)}
+      />
+
+      <Modal isOpen={editing && !!selectedTask} onClose={() => setEditing(false)} title="Edit Task">
         {selectedTask && (
           <div className="space-y-4">
-            {editing ? (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-1">Due Date</label>
-                    <input
-                      type="date"
-                      value={editForm.dueDate}
-                      onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-border-color rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-1">Due Time</label>
-                    <input
-                      type="time"
-                      value={editForm.dueTime}
-                      onChange={(e) => setEditForm({ ...editForm, dueTime: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-border-color rounded-xl text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-1">Project Type</label>
-                    <select
-                      value={editForm.projectType}
-                      onChange={(e) => setEditForm({ ...editForm, projectType: e.target.value, team: PROJECT_TEAMS[e.target.value][0] })}
-                      className="w-full px-4 py-2.5 border border-border-color rounded-xl text-sm bg-white"
-                    >
-                      <option value="STEM">STEM</option>
-                      <option value="NON_STEM">NON STEM</option>
-                      <option value="TECHNICAL">TECHNICAL</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-1">Team</label>
-                    <select
-                      value={editForm.team}
-                      onChange={(e) => setEditForm({ ...editForm, team: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-border-color rounded-xl text-sm bg-white"
-                    >
-                      {PROJECT_TEAMS[editForm.projectType]?.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex gap-3 justify-end pt-2">
-                  <button onClick={() => setEditing(false)} className="px-6 py-2.5 rounded-full border border-border-color text-text-secondary text-sm">
-                    Cancel
-                  </button>
-                  <button onClick={handleSaveEdit} className="px-6 py-2.5 rounded-full bg-btn-primary text-white text-sm font-medium hover:opacity-90">
-                    Save Changes
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-text-secondary mb-0.5">Title</p>
-                    <p className="text-text-primary font-medium">{selectedTask.title}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary mb-0.5">Status</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(selectedTask.status)}`}>
-                      {selectedTask.status}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary mb-0.5">Project</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${getProjectColor(selectedTask.projectType)}`}>
-                      {selectedTask.projectType}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary mb-0.5">Team</p>
-                    <p className="text-text-primary">{selectedTask.team}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary mb-0.5">Priority</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${getPriorityColor(selectedTask.priority)}`}>
-                      {selectedTask.priority}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary mb-0.5">Due Date</p>
-                    <p className="text-text-primary">
-                      {selectedTask.dueDate ? formatDate(selectedTask.dueDate) : '—'}{selectedTask.dueTime ? ` at ${selectedTask.dueTime}` : ''}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary mb-0.5">Assigned To</p>
-                    <p className="text-text-primary">{selectedTask.assignedTo?.email || 'Unassigned'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-secondary mb-0.5">Assignment</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${selectedTask.assignmentStatus === 'Active' ? 'bg-success/20 text-success' : 'bg-soft-red/20 text-danger'}`}>
-                      {selectedTask.assignmentStatus}
-                    </span>
-                  </div>
-                </div>
-                {selectedTask.description && (
-                  <div>
-                    <p className="text-xs text-text-secondary mb-1">Description</p>
-                    <p className="text-text-primary text-sm">{selectedTask.description}</p>
-                  </div>
-                )}
-                {selectedTask.files?.length > 0 && (
-                  <div>
-                    <p className="text-xs text-text-secondary mb-2">Attachments</p>
-                    <div className="space-y-1">
-                      {selectedTask.files.map((f, i) => (
-                        <a
-                          key={i}
-                          href={`/api/files/${f.filename}`}
-                          className="flex items-center gap-2 text-sm text-olive hover:underline py-1"
-                        >
-                          <Download size={14} /> {f.originalName}
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="flex justify-end pt-2">
-                  <button
-                    onClick={() => setEditing(true)}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-olive text-white text-sm font-medium hover:opacity-90"
-                  >
-                    <Pencil size={14} /> Edit
-                  </button>
-                </div>
-              </>
-            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-1">Due Date</label>
+                <input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} className="w-full px-4 py-2.5 border border-border-color rounded-xl text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-1">Due Time</label>
+                <input type="time" value={editForm.dueTime} onChange={(e) => setEditForm({ ...editForm, dueTime: e.target.value })} className="w-full px-4 py-2.5 border border-border-color rounded-xl text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-1">Project Type</label>
+                <select value={editForm.projectType} onChange={(e) => setEditForm({ ...editForm, projectType: e.target.value, team: PROJECT_TEAMS[e.target.value][0] })} className="w-full px-4 py-2.5 border border-border-color rounded-xl text-sm bg-white">
+                  <option value="STEM">STEM</option><option value="NON_STEM">NON STEM</option><option value="TECHNICAL">TECHNICAL</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-1">Team</label>
+                <select value={editForm.team} onChange={(e) => setEditForm({ ...editForm, team: e.target.value })} className="w-full px-4 py-2.5 border border-border-color rounded-xl text-sm bg-white">
+                  {PROJECT_TEAMS[editForm.projectType]?.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end pt-2">
+              <button onClick={() => setEditing(false)} className="px-6 py-2.5 rounded-full border border-border-color text-text-secondary text-sm">Cancel</button>
+              <button onClick={() => { handleSaveEdit(); setDetailOpen(false); }} className="px-6 py-2.5 rounded-full bg-btn-primary text-white text-sm font-medium hover:opacity-90">Save Changes</button>
+            </div>
           </div>
         )}
       </Modal>
