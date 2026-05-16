@@ -18,6 +18,11 @@ const fileFilter = (req, file, cb) => {
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/zip',
+    'text/markdown',
+    'text/plain',
+    'text/csv',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
   ];
   const isImage = file.mimetype.startsWith('image/');
 

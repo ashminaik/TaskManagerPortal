@@ -2,10 +2,29 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
+const jwt = require('jsonwebtoken');
 const Task = require('../models/Task');
-const { auth } = require('../middleware/auth');
+const User = require('../models/User');
 
-router.get('/:filename', auth, async (req, res) => {
+const softAuth = async (req, res, next) => {
+  try {
+    const header = req.headers.authorization;
+    const queryToken = req.query.token;
+    const tokenStr = header?.startsWith('Bearer ') ? header.split(' ')[1] : queryToken;
+
+    if (!tokenStr) return res.status(401).json({ message: 'No token provided' });
+
+    const decoded = jwt.verify(tokenStr, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+    if (!user) return res.status(401).json({ message: 'User not found' });
+    req.user = user;
+    next();
+  } catch {
+    res.status(401).json({ message: 'Invalid token' });
+  }
+};
+
+router.get('/:filename', softAuth, async (req, res) => {
   try {
     const filePath = path.join(__dirname, '../../uploads', req.params.filename);
 
@@ -24,6 +43,8 @@ router.get('/:filename', auth, async (req, res) => {
       }
     }
 
+    const fileRecord = task.files.find((f) => f.filename === req.params.filename);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileRecord?.originalName || req.params.filename}"`);
     res.sendFile(filePath);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

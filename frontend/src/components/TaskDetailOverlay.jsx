@@ -11,19 +11,14 @@ export default function TaskDetailOverlay({ task, onClose, statusOptions, onStat
         className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto"
         style={{ backgroundColor: '#F5F0E8', border: '2px solid #A8C4E0', borderRadius: '16px' }}
       >
-        <div className="sticky top-0 px-8 pt-6 pb-3 flex items-start justify-between z-10" style={{ backgroundColor: '#F5F0E8' }}>
-          <div>
+        <div className="sticky top-0 px-8 pt-6 pb-3 flex items-start z-10" style={{ backgroundColor: '#F5F0E8' }}>
+          <div className="flex-1">
             <h2 className="text-2xl font-bold text-text-primary">{task.title}</h2>
             <p className="text-sm text-text-secondary mt-1">{task.projectType} · {task.team}</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-black/5">
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-black/5 -mr-1 -mt-1">
             <X size={22} className="text-text-secondary" />
           </button>
-          {onEdit && (
-            <button onClick={onEdit} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-olive text-white text-sm font-medium hover:opacity-90">
-              <Pencil size={14} /> Edit
-            </button>
-          )}
         </div>
 
         <div className="px-8 pb-8 space-y-6">
@@ -82,7 +77,7 @@ export default function TaskDetailOverlay({ task, onClose, statusOptions, onStat
               <h4 className="text-sm font-semibold text-text-primary mb-2">Attachments ({task.files.length})</h4>
               <div className="space-y-2">
                 {task.files.map((f, i) => (
-                  <a key={i} href={`/api/files/${f.filename}`} target="_blank" rel="noopener noreferrer"
+                  <a key={i} href={`/api/files/${f.filename}?token=${localStorage.getItem('etharaToken') || ''}`} target="_blank" rel="noopener noreferrer"
                     className="flex items-center justify-between py-3 px-4 bg-white/60 rounded-xl hover:bg-olive/10 transition-colors group"
                   >
                     <div className="flex items-center gap-3">
@@ -105,6 +100,14 @@ export default function TaskDetailOverlay({ task, onClose, statusOptions, onStat
             <p className="text-xs text-text-secondary text-right pt-4 border-t border-border-color/50">
               Created by {task.createdBy.email} · {formatDate(task.createdAt)}
             </p>
+          )}
+
+          {onEdit && (
+            <div className="flex justify-end pt-2">
+              <button onClick={onEdit} className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-olive text-white text-sm font-medium hover:opacity-90">
+                <Pencil size={14} /> Edit
+              </button>
+            </div>
           )}
         </div>
       </div>
