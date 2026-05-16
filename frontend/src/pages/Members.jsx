@@ -76,7 +76,7 @@ export default function Members() {
   filtered.forEach((m) => { if (m.project && projectColumns[m.project]) projectColumns[m.project].push(m); });
 
   const renderMemberRow = (m) => (
-    <div key={m._id} className="bg-white rounded-2xl border border-border-color overflow-hidden">
+    <div key={m._id} className="bg-white rounded-2xl border border-border-color">
       <div className="flex items-center justify-between p-5 cursor-pointer hover:bg-hover-highlight/50 transition-colors" onClick={() => toggleExpand(m._id)}>
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-full bg-olive/20 flex items-center justify-center text-olive font-bold">{m.name?.[0]?.toUpperCase() || m.email[0].toUpperCase()}</div>
