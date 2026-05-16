@@ -1,74 +1,155 @@
 import { useState, useEffect } from 'react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  PieChart, Pie, Cell, ResponsiveContainer, Legend,
-} from 'recharts';
-import { Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { dashboardAPI } from '../api/axios';
-import Spinner from '../components/Spinner';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { dashboardAPI, tasksAPI } from '../api/axios';
 
-const PIE_COLORS = ['#9BA86F', '#E8C7D3', '#B7C9EA', '#E9C75B', '#E58D8D'];
-const BAR_COLORS = {
-  STEM: '#E8C7D3',
-  'NON STEM': '#B7C9EA',
-  TECHNICAL: '#E9C75B',
+const COLORS = { STEM: '#3B82F6', 'NON_STEM': '#8B5CF6', TECHNICAL: '#22C55E' };
+const TEAM_SHADES = {
+  Valor: '#3B82F6', Vindex: '#60A5FA',
+  Evals: '#8B5CF6',
+  Fenrir: '#22C55E', Kensei: '#4ADE80', Jaeger: '#86EFAC',
 };
+const BAR_COLORS = { STEM: '#3B82F6', 'NON_STEM': '#8B5CF6', TECHNICAL: '#22C55E' };
+const STATUS_COLORS = { Done: '#22C55E', 'In Progress': '#3B82F6', Overdue: '#EF4444', 'To Do': '#F59E0B' };
+
+const DarkTooltip = ({ active, payload }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ background: '#1E293B', color: '#fff', padding: '8px 12px', fontSize: '12px', lineHeight: 1.4 }}>
+      {payload.map((p, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.payload.fill || p.color, display: 'inline-block' }} />
+          <span>{p.name}: <strong>{p.value}</strong></span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+function DonutCard({ title, data, total, colors }) {
+  return (
+    <div className="bg-white border border-[#E5E7EB]" style={{ borderRadius: '4px' }}>
+      <div className="px-5 py-4 border-b border-[#E5E7EB]">
+        <h4 className="text-sm font-semibold text-[#1F2A44]">{title}</h4>
+      </div>
+      <div className="p-5 flex flex-col items-center">
+        <div style={{ width: 160, height: 160, position: 'relative' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={2}>
+                {data.map((_, i) => <Cell key={i} fill={colors?.[i] || '#ccc'} />)}
+              </Pie>
+              <Tooltip content={<DarkTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+            <span className="text-2xl font-bold text-[#1F2A44]">{total}</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap justify-center gap-3 mt-3">
+          {data.map((d, i) => (
+            <div key={i} className="flex items-center gap-1.5 text-xs text-[#667085]">
+              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: colors?.[i] }} />
+              {d.name} ({d.value})
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BarCard({ title, data, color }) {
+  return (
+    <div className="bg-white border border-[#E5E7EB]" style={{ borderRadius: '4px', borderTop: `3px solid ${color}` }}>
+      <div className="px-5 py-4 border-b border-[#E5E7EB]">
+        <h4 className="text-sm font-semibold text-[#1F2A44]">{title}</h4>
+      </div>
+      <div className="p-5">
+        <ResponsiveContainer width="100%" height={Math.max(data.length * 50 + 30, 80)}>
+          <BarChart data={data} layout="vertical" margin={{ left: 10, right: 10 }}>
+            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#F3F4F6" />
+            <XAxis type="number" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
+            <Tooltip content={<DarkTooltip />} />
+            <Bar dataKey="value" radius={[0, 0, 0, 0]}>
+              {data.map((_, i) => <Cell key={i} fill={data[i].fill || color} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [teamData, setTeamData] = useState([]);
   const [statusData, setStatusData] = useState({});
-  const [userData, setUserData] = useState([]);
-  const [overdueData, setOverdueData] = useState([]);
-  const [userSearch, setUserSearch] = useState('');
-  const [showAllUsers, setShowAllUsers] = useState(false);
+  const [overdueByTeam, setOverdueByTeam] = useState([]);
+  const [overdueTasks, setOverdueTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       dashboardAPI.tasksByTeam(),
       dashboardAPI.tasksByStatus(),
-      dashboardAPI.tasksPerUser(),
       dashboardAPI.overdueByTeam(),
-    ]).then(([team, status, users, overdue]) => {
-      setTeamData(team.data.data);
-      setStatusData(status.data.data);
-      setUserData(users.data.data);
-      setOverdueData(overdue.data.data);
+      tasksAPI.getAll({ status: 'Overdue' }),
+    ]).then(([team, status, overdue, overdueTasksRes]) => {
+      setTeamData(team.data.data || []);
+      setStatusData(status.data.data || {});
+      setOverdueByTeam(overdue.data.data || []);
+      setOverdueTasks(overdueTasksRes.data.tasks || []);
+      setLoading(false);
     });
   }, []);
 
   const totalTasks = Object.values(statusData).reduce((a, b) => a + b, 0);
+  const totalOverdue = statusData.Overdue || 0;
 
-  const filteredUsers = userData.filter((u) => {
-    const term = userSearch.toLowerCase();
-    return (
-      u.email?.toLowerCase().includes(term) ||
-      u.name?.toLowerCase().includes(term) ||
-      u.project?.toLowerCase().includes(term)
-    );
+  const projectTotals = {};
+  teamData.forEach((d) => {
+    if (!projectTotals[d.project]) projectTotals[d.project] = 0;
+    projectTotals[d.project] += d.count;
   });
-  const displayedUsers = showAllUsers ? filteredUsers : filteredUsers.slice(0, 5);
+
+  const totalDonut = Object.entries(projectTotals).map(([name, value]) => ({ name, value }));
+  const totalColors = Object.entries(projectTotals).map(([name]) => COLORS[name] || '#ccc');
+
+  const PROJECTS = ['STEM', 'NON_STEM', 'TECHNICAL'];
+  const projectDonuts = PROJECTS.map((proj) => {
+    const items = teamData.filter((d) => d.project === (proj === 'NON_STEM' ? 'NON_STEM' : proj));
+    return { project: proj, total: items.reduce((s, i) => s + i.count, 0), data: items.map((d) => ({ name: d.team, value: d.count, fill: TEAM_SHADES[d.team] || '#ccc' })) };
+  });
+
+  const projectBars = PROJECTS.map((proj) => {
+    const items = teamData.filter((d) => d.project === (proj === 'NON_STEM' ? 'NON_STEM' : proj));
+    return { project: proj, color: COLORS[proj], data: items.map((d) => ({ name: d.team, value: d.count, fill: TEAM_SHADES[d.team] || COLORS[proj] })) };
+  });
+
+  const overdueBarData = overdueByTeam.map((d) => ({ name: d.team, value: d.overdueCount, fill: TEAM_SHADES[d.team] || '#EF4444' }));
+
+  if (loading) return null;
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
+      <h1 className="text-2xl font-bold text-[#1F2A44]">Dashboard</h1>
 
       <section>
-        <h3 className="text-lg font-semibold text-text-primary mb-4">Tasks Analytics</h3>
+        <h3 className="text-lg font-semibold text-[#1F2A44] mb-4">Tasks Analytics</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {['STEM', 'NON STEM', 'TECHNICAL'].map((project) => {
-            const projectData = teamData
-              .filter((d) => d.project === (project === 'NON STEM' ? 'NON_STEM' : project))
-              .map((d) => ({ team: d.team, tasks: d.count }));
+          {['STEM', 'NON_STEM', 'TECHNICAL'].map((project) => {
+            const projKey = project === 'NON_STEM' ? 'NON_STEM' : project;
+            const projectData = teamData.filter((d) => d.project === projKey).map((d) => ({ team: d.team, tasks: d.count }));
             return (
-              <div key={project} className="bg-white rounded-2xl border border-border-color p-5">
-                <h4 className="text-sm font-semibold text-text-primary mb-3">{project}</h4>
+              <div key={project} className="bg-white border border-[#E5E7EB] rounded p-5" style={{ borderRadius: '4px' }}>
+                <h4 className="text-sm font-semibold text-[#1F2A44] mb-3">{project}</h4>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={projectData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
                     <XAxis dataKey="team" tick={{ fontSize: 12 }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                    <Tooltip />
-                    <Bar dataKey="tasks" fill={BAR_COLORS[project]} radius={[8, 8, 0, 0]} />
+                    <Tooltip content={<DarkTooltip />} />
+                    <Bar dataKey="tasks" fill={BAR_COLORS[project]} radius={[0, 0, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -78,127 +159,96 @@ export default function Dashboard() {
       </section>
 
       <section>
-        <h3 className="text-lg font-semibold text-text-primary mb-4">Tasks by Status</h3>
-        <div className="bg-white rounded-2xl border border-border-color p-6">
-          <div className="w-full h-10 rounded-full overflow-hidden flex">
-            {Object.entries(statusData).map(([status, count]) =>
-              count > 0 ? (
-                <div
-                  key={status}
-                  style={{ width: `${(count / totalTasks) * 100}%` }}
-                  className={`h-full flex items-center justify-center text-xs font-medium ${
-                    status === 'Done'
-                      ? 'bg-success'
-                      : status === 'In Progress'
-                      ? 'bg-soft-blue'
-                      : status === 'Overdue'
-                      ? 'bg-danger'
-                      : 'bg-soft-yellow'
-                  }`}
-                >
+        <h2 className="text-xl font-bold text-[#1F2A44] mb-1">Total Tasks</h2>
+        <p className="text-4xl font-bold text-[#1F2A44] mb-6">{totalTasks}</p>
+        <div className="max-w-md">
+          <DonutCard title="Tasks by Project" data={totalDonut} total={totalTasks} colors={totalColors} />
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-lg font-semibold text-[#1F2A44] mb-4">Tasks by Status</h3>
+        <div className="bg-white border border-[#E5E7EB] rounded p-6" style={{ borderRadius: '4px' }}>
+          <div className="w-full h-10 flex overflow-hidden" style={{ borderRadius: '4px' }}>
+            {Object.entries(STATUS_COLORS).map(([status, color]) => {
+              const count = statusData[status] || 0;
+              return count > 0 ? (
+                <div key={status} style={{ width: `${(count / totalTasks) * 100}%`, backgroundColor: color }}
+                  className="h-full flex items-center justify-center text-xs font-medium text-white">
                   {count}
                 </div>
-              ) : null
+              ) : null;
+            })}
+          </div>
+          <div className="flex flex-wrap gap-4 mt-4 text-sm text-[#667085]">
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 inline-block" style={{ backgroundColor: '#22C55E', borderRadius: '50%' }} /> Done: {statusData['Done'] || 0}</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 inline-block" style={{ backgroundColor: '#3B82F6', borderRadius: '50%' }} /> In Progress: {statusData['In Progress'] || 0}</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 inline-block" style={{ backgroundColor: '#EF4444', borderRadius: '50%' }} /> Overdue: {totalOverdue}</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 inline-block" style={{ backgroundColor: '#F59E0B', borderRadius: '50%' }} /> To Do: {statusData['To Do'] || 0}</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-lg font-bold text-[#1F2A44] mb-4">Total Tasks Per Project</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {projectDonuts.map((p) => (
+            <DonutCard key={p.project} title={p.project} data={p.data} total={p.total} colors={p.data.map((d) => d.fill)} />
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-lg font-bold text-[#1F2A44] mb-4">Tasks by Team</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {projectBars.map((p) => (
+            <BarCard key={p.project} title={p.project} data={p.data} color={p.color} />
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-lg font-bold text-[#1F2A44] mb-1">Overdue Tasks</h3>
+        <p className="text-3xl font-bold text-[#EF4444] mb-4">{totalOverdue}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white border border-[#E5E7EB] rounded p-6" style={{ borderRadius: '4px' }}>
+            <h4 className="text-sm font-semibold text-[#1F2A44] mb-4">Overdue by Project</h4>
+            <div className="w-full h-10 flex overflow-hidden" style={{ borderRadius: '4px' }}>
+              {overdueByTeam.map((d) => {
+                const w = totalOverdue > 0 ? (d.overdueCount / totalOverdue) * 100 : 0;
+                return d.overdueCount > 0 ? (
+                  <div key={d.team} style={{ width: `${w}%`, backgroundColor: TEAM_SHADES[d.team] || '#EF4444' }}
+                    className="h-full flex items-center justify-center text-xs font-medium text-white">
+                    {d.overdueCount}
+                  </div>
+                ) : null;
+              })}
+            </div>
+            <div className="flex flex-wrap gap-4 mt-4 text-sm text-[#667085]">
+              {overdueByTeam.map((d) => (
+                <span key={d.team} className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 inline-block rounded-full" style={{ backgroundColor: TEAM_SHADES[d.team] || '#EF4444' }} />
+                  {d.team}: {d.overdueCount}
+                </span>
+              ))}
+              {overdueByTeam.length === 0 && <span>No overdue tasks</span>}
+            </div>
+          </div>
+          <div className="bg-white border border-[#E5E7EB] rounded p-6" style={{ borderRadius: '4px' }}>
+            <h4 className="text-sm font-semibold text-[#1F2A44] mb-4">Overdue Task List</h4>
+            {overdueTasks.length === 0 ? (
+              <p className="text-sm text-[#667085]">No overdue tasks.</p>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {overdueTasks.map((t) => (
+                  <div key={t._id} className="flex items-center justify-between py-2 px-3 bg-[#FEF2F2] rounded text-sm">
+                    <span className="text-[#1F2A44] font-medium truncate flex-1">{t.title}</span>
+                    <span className="text-xs text-[#667085] ml-2 whitespace-nowrap">{t.projectType} · {t.team}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-          <div className="flex flex-wrap gap-4 mt-4 text-sm text-text-secondary">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-success inline-block" /> Done: {statusData['Done'] || 0}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-soft-blue inline-block" /> In Progress: {statusData['In Progress'] || 0}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-danger inline-block" /> Overdue: {statusData['Overdue'] || 0}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-soft-yellow inline-block" /> To Do: {statusData['To Do'] || 0}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <h3 className="text-lg font-semibold text-text-primary mb-4">Tasks per User</h3>
-        <div className="bg-white rounded-2xl border border-border-color p-6">
-          <div className="relative mb-4">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-            <input
-              type="text"
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-              placeholder="Filter by user name..."
-              className="w-full max-w-sm pl-9 pr-4 py-2 border border-border-color rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-olive/30"
-            />
-          </div>
-          <div className="space-y-2">
-            {displayedUsers.map((u) => (
-              <div
-                key={u.userId}
-                className="flex items-center justify-between py-3 px-4 rounded-xl hover:bg-hover-highlight"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-olive/20 flex items-center justify-center text-olive text-sm font-medium">
-                    {u.name?.[0]?.toUpperCase() || u.email?.[0]?.toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-text-primary">{u.name || u.email}</p>
-                    <p className="text-xs text-text-secondary">
-                      {u.project || '—'} — {u.team || '—'}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-text-primary">{u.count} tasks</p>
-                  <p className="text-xs text-text-secondary truncate max-w-[200px]">
-                    {u.taskTitles?.join(', ')}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-          {filteredUsers.length > 5 && (
-            <button
-              onClick={() => setShowAllUsers(!showAllUsers)}
-              className="mt-3 flex items-center gap-1 text-sm text-olive hover:underline"
-            >
-              {showAllUsers ? (
-                <>
-                  Show Less <ChevronUp size={14} />
-                </>
-              ) : (
-                <>
-                  Show More ({filteredUsers.length - 5} more) <ChevronDown size={14} />
-                </>
-              )}
-            </button>
-          )}
-        </div>
-      </section>
-
-      <section>
-        <h3 className="text-lg font-semibold text-text-primary mb-4">
-          Overdue Tasks by Team
-        </h3>
-        <div className="bg-white rounded-2xl border border-border-color p-6">
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={overdueData}
-                dataKey="overdueCount"
-                nameKey="team"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                label={({ team, overdueCount }) => `${team}: ${overdueCount}`}
-              >
-                {overdueData.map((_, i) => (
-                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
         </div>
       </section>
     </div>
